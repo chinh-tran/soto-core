@@ -595,7 +595,18 @@ extension AWSClient {
         let awsResponse = try AWSResponse(from: response, serviceProtocol: serviceConfig.serviceProtocol, raw: raw)
             .applyMiddlewares(serviceConfig.middlewares + middlewares, config: serviceConfig)
 
-        return try awsResponse.generateOutputShape(operation: operationName)
+        let startTime = DispatchTime.now().uptimeNanoseconds
+
+        let output: Output = try awsResponse.generateOutputShape(operation: operationName)
+
+        let dimensions: [(String, String)] = [("aws-service", serviceConfig.service), ("aws-operation", operationName)]
+        Metrics.Timer(
+            label: "aws_generate_output_shape_duration",
+            dimensions: dimensions,
+            preferredDisplayUnit: .seconds
+        ).recordNanoseconds(DispatchTime.now().uptimeNanoseconds - startTime)
+
+        return output
     }
 
     /// Create error from HTTPResponse. This is only called if we received an unsuccessful http status code.
